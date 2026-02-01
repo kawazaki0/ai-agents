@@ -1,36 +1,35 @@
-import re
+import json
 from typing import Callable
 
-from tavily import TavilyClient
+from mcp_client import MCPToolClient
 
 
 class AgentTools:
     def __init__(self, config):
+        self._mcp_tools_dict = None
         self._config = config
-        self._agent_tools = {
-            'calculate': self._calculate,
-            'cats_weight': self._cats_weight_information,
-            'get_knowledge': self._get_knowledge
-        }
+        self._mcp_client = None
 
-    def get_tool(self, tool_name) -> Callable:
-        return self._agent_tools.get(tool_name)
+    def init(self):
+        if not self._mcp_client:
+            self._mcp_client = MCPToolClient(self._config.mcp_server_path)
+            self._mcp_client.connect()
+            self._mcp_tools_dict = self._mcp_client.get_available_tools_dict()
+            print(f"[SYSTEM] Connected to MCP server with tools: {list(self._mcp_tools_dict.keys())}")
 
-    def _calculate(self, expression: str) -> str:
-        if not re.fullmatch(r'[\d\s\+\-\*\/\.\(\)]+', expression):
-            return "Only mathematical operations are allowed."
-        return eval(expression)
+    def get_tool(self, tool_name: str) -> Callable | None:
+        if not self._mcp_client:
+            raise RuntimeError("MCP client not initialized. Call init() first.")
+        if tool_name not in self._mcp_tools_dict:
+            return None
+        def mcp_tool_wrapper(tool_input: str) -> str:
+            return self._mcp_client.call_tool(tool_name, json.loads(tool_input))
+        mcp_tool_wrapper.__name__ = f"mcp_{tool_name}"
+        return mcp_tool_wrapper
 
-    def _cats_weight_information(self, cat_type: str) -> str:
-        if cat_type == 'barry':
-            return '20kg'
-        elif cat_type == 'harry':
-            return '40kg'
-        elif cat_type == 'garry':
-            return '10kg'
-        else:
-            return 'average cat weight is 5 kg'
+    def get_available_tools(self):
+        return self._mcp_tools_dict
 
-    def _get_knowledge(self, question: str) -> str:
-        tavily_client = TavilyClient(api_key=self._config.tavily_api_key)
-        return tavily_client.search(question).get('results')[0]['content']
+    def cleanup(self):
+        if self._mcp_client:
+            self._mcp_client.cleanup()

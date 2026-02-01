@@ -1,0 +1,9 @@
+# Core dependencies for AI Agents with MCP integration
+openai>=1.0.0
+httpx>=0.25.0
+python-dotenv>=0.19.0
+
+# Optional: Tavily for fallback knowledge search (only used if MCP fails)
+tavily-python>=0.3.0
+fastmcp
+anthropic
